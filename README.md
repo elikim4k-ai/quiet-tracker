@@ -29,15 +29,30 @@ Open http://localhost:3210
 - **Discovery**: the 🔭 button asks the AI for new quantum/AI software companies not already in your tracker and files them under the right category. A banner reminds you when it hasn't run in 7 days.
 - **AI classify**: fills in Quantum/AI category (and product descriptions when known) for uncategorized companies.
 
-## Data
+## Data & storage modes
 
-Everything lives in `data/db.json` — prospects, settings, API keys. It never leaves your machine except for calls to your chosen AI provider and your SMTP server. Back it up by copying the file.
+- **Shared mode** (deployed, or locally with `.env.local`): data lives in Supabase tables `qt_prospects` / `qt_state` — everyone with the password sees the same live tracker.
+- **Local mode** (no Supabase env vars): data lives in `data/db.json` on this machine.
 
-## Optional: run discovery automatically every week
+AI keys can go in the Settings tab (stored in the DB) or as `OPENAI_API_KEY` / `GEMINI_API_KEY` env vars (env is used when Settings is empty).
 
-Windows Task Scheduler → Create Basic Task → Weekly → Action "Start a program":
+## Deploy to Vercel (24/7 + share with coworkers)
 
-- Program: `powershell`
-- Arguments: `-Command "Invoke-RestMethod -Method Post -Uri http://localhost:3210/api/discover"`
+The repo is at **https://github.com/elikim4k-ai/quiet-tracker** (private).
 
-(The app must be running. Otherwise just click the banner when it appears.)
+1. Go to https://vercel.com/new → Import `elikim4k-ai/quiet-tracker`.
+2. **Framework Preset must say "Next.js"** (if it says "Other", fix it — otherwise every route 404s).
+3. Add Environment Variables (Production + Preview) — copy values from `.env.local`:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `TRACKER_PASSWORD` — the password you'll share with coworkers
+   - `CRON_SECRET` — protects the cron endpoints
+   - `OPENAI_API_KEY` **or** `GEMINI_API_KEY` (or paste the key in Settings after deploy)
+4. Deploy. Share the URL + `TRACKER_PASSWORD` with coworkers.
+
+### Automation once deployed (vercel.json)
+
+- **Daily 13:00 UTC** — `/api/cron/followups`: drafts a follow-up for every prospect whose timer is due. If **Settings → Automation → Auto-send** is ON and SMTP is configured, it also sends the emails. Default is OFF (drafts wait for your review).
+- **Weekly Monday 14:00 UTC** — `/api/cron/discover`: adds new Quantum/AI companies automatically.
+
+Pushing to `main` auto-deploys.
