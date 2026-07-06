@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 export default function SettingsPanel({ settings, onSaved }) {
   const [form, setForm] = useState(settings);
   const [busy, setBusy] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testing, setTesting] = useState(false);
   useEffect(() => { if (settings) setForm(settings); }, [settings]);
   if (!form) return <div className="empty">Loading…</div>;
 
@@ -15,6 +17,28 @@ export default function SettingsPanel({ settings, onSaved }) {
     const r = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }).then((r) => r.json());
     setBusy(false);
     onSaved(r.settings);
+  }
+
+  async function testConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // Send the current form values so unsaved keys/models are tested too.
+      const r = await fetch('/api/test-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aiProvider: form.aiProvider,
+          openaiApiKey: form.openaiApiKey, openaiModel: form.openaiModel,
+          geminiApiKey: form.geminiApiKey, geminiModel: form.geminiModel,
+          grokApiKey: form.grokApiKey, grokModel: form.grokModel,
+        }),
+      }).then((r) => r.json());
+      setTestResult(r);
+    } catch (e) {
+      setTestResult({ ok: false, error: e.message });
+    }
+    setTesting(false);
   }
 
   return (
@@ -48,6 +72,18 @@ export default function SettingsPanel({ settings, onSaved }) {
               <div className="field"><label>Grok model</label><input value={form.grokModel} onChange={(e) => set('grokModel', e.target.value)} placeholder="grok-4-fast" /></div>
               <div className="field full"><label>Grok API key</label><input type="password" value={form.grokApiKey} onChange={(e) => set('grokApiKey', e.target.value)} placeholder="xai-…" /></div>
             </>
+          )}
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="btn" onClick={testConnection} disabled={testing}>
+            {testing ? 'Testing…' : '🔌 Test connection'}
+          </button>
+          {testResult && (
+            <span className={`notice ${testResult.ok ? 'ok' : 'err'}`} style={{ margin: 0, flex: 1 }}>
+              {testResult.ok
+                ? `✓ Working — ${testResult.provider} / ${testResult.model} replied "${testResult.reply}" in ${testResult.ms} ms`
+                : `✗ Failed (${testResult.provider} / ${testResult.model}): ${testResult.error}`}
+            </span>
           )}
         </div>
       </div>
