@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PROVIDERS } from '@/lib/providers';
 import ProspectDrawer from './ProspectDrawer';
 import SettingsPanel from './SettingsPanel';
 
@@ -106,11 +107,8 @@ export default function Dashboard() {
 
   const stages = [...new Set(prospects.map((p) => p.stage))];
   const discoveryStale = !meta.lastDiscoveryRun || Date.now() - new Date(meta.lastDiscoveryRun).getTime() > 7 * 86400000;
-  const aiReady = settings && (
-    (settings.aiProvider === 'openai' && settings.openaiApiKey) ||
-    (settings.aiProvider === 'gemini' && settings.geminiApiKey) ||
-    (settings.aiProvider === 'grok' && settings.grokApiKey)
-  );
+  const activeProvider = settings && (PROVIDERS[settings.aiProvider] || PROVIDERS.openai);
+  const aiReady = Boolean(settings && activeProvider && settings[activeProvider.keyField]);
 
   return (
     <div className="container">
@@ -133,7 +131,7 @@ export default function Dashboard() {
       {notice && <div className={`notice ${notice.type}`}>{notice.text}</div>}
       {settings && !aiReady && (
         <div className="notice warn">
-          No AI key configured — add an OpenAI, Gemini, or Grok API key in the <a onClick={() => setTab('settings')} style={{ cursor: 'pointer' }}>Settings</a> tab to enable drafting, discovery, and classification.
+          No API key for {activeProvider?.label || 'the selected AI provider'} — add one in the <a onClick={() => setTab('settings')} style={{ cursor: 'pointer' }}>Settings</a> tab to enable drafting, discovery, and classification.
         </div>
       )}
       {discoveryStale && aiReady && (

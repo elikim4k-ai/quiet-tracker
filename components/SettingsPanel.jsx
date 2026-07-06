@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { PROVIDERS } from '@/lib/providers';
 
 export default function SettingsPanel({ settings, onSaved }) {
   const [form, setForm] = useState(settings);
@@ -24,15 +25,17 @@ export default function SettingsPanel({ settings, onSaved }) {
     setTestResult(null);
     try {
       // Send the current form values so unsaved keys/models are tested too.
+      // Send current form values (all provider fields) so unsaved keys/models are tested too.
+      const fields = { aiProvider: form.aiProvider };
+      for (const p of Object.values(PROVIDERS)) {
+        fields[p.keyField] = form[p.keyField];
+        fields[p.modelField] = form[p.modelField];
+        if (p.urlField) fields[p.urlField] = form[p.urlField];
+      }
       const r = await fetch('/api/test-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          aiProvider: form.aiProvider,
-          openaiApiKey: form.openaiApiKey, openaiModel: form.openaiModel,
-          geminiApiKey: form.geminiApiKey, geminiModel: form.geminiModel,
-          grokApiKey: form.grokApiKey, grokModel: form.grokModel,
-        }),
+        body: JSON.stringify(fields),
       }).then((r) => r.json());
       setTestResult(r);
     } catch (e) {
@@ -45,34 +48,37 @@ export default function SettingsPanel({ settings, onSaved }) {
     <div style={{ maxWidth: 780 }}>
       <div className="card">
         <h3>🤖 AI provider</h3>
-        <p className="hint">Pick OpenAI, Google Gemini, or xAI Grok and paste the matching API key. Keys are stored in the tracker database and only sent to the provider you choose.</p>
+        <p className="hint">Pick a provider and paste the matching API key. Keys are stored in the tracker database and only sent to the provider you choose. Use "Custom" for any other OpenAI-compatible API.</p>
         <div className="fieldgrid">
           <div className="field">
             <label>Provider</label>
             <select value={form.aiProvider} onChange={(e) => set('aiProvider', e.target.value)}>
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="grok">xAI Grok</option>
+              {Object.entries(PROVIDERS).map(([id, p]) => (
+                <option key={id} value={id}>{p.label}</option>
+              ))}
             </select>
           </div>
-          {form.aiProvider === 'openai' && (
-            <>
-              <div className="field"><label>OpenAI model</label><input value={form.openaiModel} onChange={(e) => set('openaiModel', e.target.value)} placeholder="gpt-4o-mini" /></div>
-              <div className="field full"><label>OpenAI API key</label><input type="password" value={form.openaiApiKey} onChange={(e) => set('openaiApiKey', e.target.value)} placeholder="sk-…" /></div>
-            </>
-          )}
-          {form.aiProvider === 'gemini' && (
-            <>
-              <div className="field"><label>Gemini model</label><input value={form.geminiModel} onChange={(e) => set('geminiModel', e.target.value)} placeholder="gemini-flash-latest" /></div>
-              <div className="field full"><label>Gemini API key</label><input type="password" value={form.geminiApiKey} onChange={(e) => set('geminiApiKey', e.target.value)} placeholder="AIza…" /></div>
-            </>
-          )}
-          {form.aiProvider === 'grok' && (
-            <>
-              <div className="field"><label>Grok model</label><input value={form.grokModel} onChange={(e) => set('grokModel', e.target.value)} placeholder="grok-4-fast" /></div>
-              <div className="field full"><label>Grok API key</label><input type="password" value={form.grokApiKey} onChange={(e) => set('grokApiKey', e.target.value)} placeholder="xai-…" /></div>
-            </>
-          )}
+          {(() => {
+            const p = PROVIDERS[form.aiProvider] || PROVIDERS.openai;
+            return (
+              <>
+                <div className="field">
+                  <label>{p.label} model</label>
+                  <input value={form[p.modelField] || ''} onChange={(e) => set(p.modelField, e.target.value)} placeholder={p.defaultModel || 'model name'} />
+                </div>
+                {p.urlField && (
+                  <div className="field full">
+                    <label>Base URL</label>
+                    <input value={form[p.urlField] || ''} onChange={(e) => set(p.urlField, e.target.value)} placeholder="https://api.example.com/v1" />
+                  </div>
+                )}
+                <div className="field full">
+                  <label>{p.label} API key</label>
+                  <input type="password" value={form[p.keyField] || ''} onChange={(e) => set(p.keyField, e.target.value)} placeholder={p.placeholder} />
+                </div>
+              </>
+            );
+          })()}
         </div>
         <div className="row" style={{ marginTop: 12 }}>
           <button className="btn" onClick={testConnection} disabled={testing}>
