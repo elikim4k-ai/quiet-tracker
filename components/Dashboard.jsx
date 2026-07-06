@@ -106,7 +106,11 @@ export default function Dashboard() {
 
   const stages = [...new Set(prospects.map((p) => p.stage))];
   const discoveryStale = !meta.lastDiscoveryRun || Date.now() - new Date(meta.lastDiscoveryRun).getTime() > 7 * 86400000;
-  const aiReady = settings && ((settings.aiProvider === 'openai' && settings.openaiApiKey) || (settings.aiProvider === 'gemini' && settings.geminiApiKey));
+  const aiReady = settings && (
+    (settings.aiProvider === 'openai' && settings.openaiApiKey) ||
+    (settings.aiProvider === 'gemini' && settings.geminiApiKey) ||
+    (settings.aiProvider === 'grok' && settings.grokApiKey)
+  );
 
   return (
     <div className="container">
@@ -129,7 +133,7 @@ export default function Dashboard() {
       {notice && <div className={`notice ${notice.type}`}>{notice.text}</div>}
       {settings && !aiReady && (
         <div className="notice warn">
-          No AI key configured — add an OpenAI or Gemini API key in the <a onClick={() => setTab('settings')} style={{ cursor: 'pointer' }}>Settings</a> tab to enable drafting, discovery, and classification.
+          No AI key configured — add an OpenAI, Gemini, or Grok API key in the <a onClick={() => setTab('settings')} style={{ cursor: 'pointer' }}>Settings</a> tab to enable drafting, discovery, and classification.
         </div>
       )}
       {discoveryStale && aiReady && (

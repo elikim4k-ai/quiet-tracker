@@ -21,24 +21,32 @@ export default function SettingsPanel({ settings, onSaved }) {
     <div style={{ maxWidth: 780 }}>
       <div className="card">
         <h3>🤖 AI provider</h3>
-        <p className="hint">Pick OpenAI or Gemini and paste the matching API key. The key stays in a local file on this computer (data/db.json) and is only sent to the provider you choose.</p>
+        <p className="hint">Pick OpenAI, Google Gemini, or xAI Grok and paste the matching API key. Keys are stored in the tracker database and only sent to the provider you choose.</p>
         <div className="fieldgrid">
           <div className="field">
             <label>Provider</label>
             <select value={form.aiProvider} onChange={(e) => set('aiProvider', e.target.value)}>
               <option value="openai">OpenAI</option>
               <option value="gemini">Google Gemini</option>
+              <option value="grok">xAI Grok</option>
             </select>
           </div>
-          {form.aiProvider === 'openai' ? (
+          {form.aiProvider === 'openai' && (
             <>
               <div className="field"><label>OpenAI model</label><input value={form.openaiModel} onChange={(e) => set('openaiModel', e.target.value)} placeholder="gpt-4o-mini" /></div>
               <div className="field full"><label>OpenAI API key</label><input type="password" value={form.openaiApiKey} onChange={(e) => set('openaiApiKey', e.target.value)} placeholder="sk-…" /></div>
             </>
-          ) : (
+          )}
+          {form.aiProvider === 'gemini' && (
             <>
-              <div className="field"><label>Gemini model</label><input value={form.geminiModel} onChange={(e) => set('geminiModel', e.target.value)} placeholder="gemini-2.0-flash" /></div>
+              <div className="field"><label>Gemini model</label><input value={form.geminiModel} onChange={(e) => set('geminiModel', e.target.value)} placeholder="gemini-flash-latest" /></div>
               <div className="field full"><label>Gemini API key</label><input type="password" value={form.geminiApiKey} onChange={(e) => set('geminiApiKey', e.target.value)} placeholder="AIza…" /></div>
+            </>
+          )}
+          {form.aiProvider === 'grok' && (
+            <>
+              <div className="field"><label>Grok model</label><input value={form.grokModel} onChange={(e) => set('grokModel', e.target.value)} placeholder="grok-4-fast" /></div>
+              <div className="field full"><label>Grok API key</label><input type="password" value={form.grokApiKey} onChange={(e) => set('grokApiKey', e.target.value)} placeholder="xai-…" /></div>
             </>
           )}
         </div>
