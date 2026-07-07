@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const F = ({ label, children }) => (
   <div className="field">
@@ -7,6 +7,124 @@ const F = ({ label, children }) => (
     {children}
   </div>
 );
+
+// One draft: inline-editable, sendable, and revisable via an AI instruction box.
+function DraftCard({ d, prospect: p, flash, onChanged }) {
+  const [subject, setSubject] = useState(d.subject);
+  const [body, setBody] = useState(d.body);
+  const [instruction, setInstruction] = useState('');
+  const [busy, setBusy] = useState('');
+  useEffect(() => { setSubject(d.subject); setBody(d.body); }, [d.subject, d.body]);
+  const dirty = subject !== d.subject || body !== d.body;
+
+  async function saveEdits() {
+    setBusy('save');
+    const drafts = p.drafts.map((x) => (x.ts === d.ts ? { ...x, subject, body, edited: true } : x));
+    const r = await fetch(`/api/prospects/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drafts }),
+    }).then((r) => r.json());
+    setBusy('');
+    if (r.error) return flash('err', r.error);
+    flash('ok', 'Draft edits saved.');
+    onChanged();
+  }
+
+  async function revise() {
+    if (!instruction.trim()) return;
+    setBusy('revise');
+    const r = await fetch('/api/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prospectId: p.id,
+        type: 'revise',
+        draftTs: d.ts,
+        instructions: instruction.trim(),
+        currentSubject: subject,
+        currentBody: body,
+      }),
+    }).then((r) => r.json());
+    setBusy('');
+    if (r.error) return flash('err', r.error);
+    setInstruction('');
+    flash('ok', 'Draft revised by AI.');
+    onChanged();
+  }
+
+  async function send() {
+    if (!confirm(`Send this email to ${p.contactPerson || p.organization} <${p.email}>?\n\nSubject: ${subject}`)) return;
+    setBusy('send');
+    const r = await fetch('/api/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prospectId: p.id, subject, body, draftTs: d.ts }),
+    }).then((r) => r.json());
+    setBusy('');
+    if (r.error) return flash('err', r.error);
+    flash('ok', `Email sent to ${p.email}.`);
+    onChanged();
+  }
+
+  function copy() {
+    navigator.clipboard.writeText(subject ? `Subject: ${subject}\n\n${body}` : body);
+    flash('ok', 'Copied to clipboard.');
+  }
+
+  return (
+    <div className="draftcard">
+      <div className="meta">
+        <span className="badge stage">{d.type}</span>
+        <span className="badge no">{d.channel}</span>
+        {d.sent && <span className="badge yes">sent</span>}
+        {d.revised && !d.sent && <span className="badge pending">revised</span>}
+        {dirty && <span className="badge pending">unsaved edits</span>}
+        <span>{new Date(d.ts).toLocaleString()}</span>
+      </div>
+      {d.channel === 'email' && (
+        <div className="field full" style={{ marginBottom: 8 }}>
+          <label>Subject</label>
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} disabled={d.sent} />
+        </div>
+      )}
+      <div className="field full">
+        <label>Message</label>
+        <textarea rows={Math.min(14, Math.max(5, body.split('\n').length + 1))} value={body} onChange={(e) => setBody(e.target.value)} disabled={d.sent} />
+      </div>
+      {!d.sent && (
+        <div className="row" style={{ marginTop: 8 }}>
+          <input
+            style={{ flex: 1, background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 8, padding: '8px 10px', fontSize: 13 }}
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            placeholder='Ask AI to revise… e.g. "shorter and mention our summer program"'
+            onKeyDown={(e) => e.key === 'Enter' && revise()}
+          />
+          <button className="btn small" onClick={revise} disabled={busy === 'revise' || !instruction.trim()}>
+            {busy === 'revise' ? 'Revising…' : '✨ Revise'}
+          </button>
+        </div>
+      )}
+      <div className="actions">
+        {dirty && !d.sent && (
+          <button className="btn small primary" onClick={saveEdits} disabled={busy === 'save'}>
+            {busy === 'save' ? 'Saving…' : '💾 Save edits'}
+          </button>
+        )}
+        <button className="btn small" onClick={copy}>📋 Copy</button>
+        {d.channel === 'email' && p.email && !d.sent && (
+          <button className="btn small primary" onClick={send} disabled={busy === 'send'}>
+            {busy === 'send' ? 'Sending…' : `📤 Send to ${p.email}`}
+          </button>
+        )}
+        {d.channel === 'linkedin' && p.linkedin && (
+          <a className="btn small" href={p.linkedin} target="_blank" style={{ textDecoration: 'none', display: 'inline-block' }}>Open LinkedIn ↗</a>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ProspectDrawer({ prospect: p, aiReady, onClose, onChanged, flash }) {
   const [form, setForm] = useState({ ...p });
@@ -57,28 +175,9 @@ export default function ProspectDrawer({ prospect: p, aiReady, onClose, onChange
     onChanged();
   }
 
-  async function sendEmail(d) {
-    if (!confirm(`Send this email to ${p.contactPerson || p.organization} <${p.email}>?`)) return;
-    setBusy('send');
-    const r = await fetch('/api/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prospectId: p.id, subject: d.subject, body: d.body }),
-    }).then((r) => r.json());
-    setBusy('');
-    if (r.error) return flash('err', r.error);
-    flash('ok', `Email sent to ${p.email}.`);
-    onChanged();
-  }
-
   async function markContacted() {
     await patch({ followUp: { lastContacted: new Date().toISOString() }, addStatusNote: `Contacted via ${p.followUp?.channel || 'email'} (marked manually)` });
     flash('ok', 'Marked as contacted — follow-up timer reset.');
-  }
-
-  function copyDraft(d) {
-    navigator.clipboard.writeText(d.subject ? `Subject: ${d.subject}\n\n${d.body}` : d.body);
-    flash('ok', 'Copied to clipboard.');
   }
 
   async function remove() {
@@ -209,28 +308,9 @@ export default function ProspectDrawer({ prospect: p, aiReady, onClose, onChange
         {p.drafts?.length > 0 && (
           <div className="section">
             <h3>Drafts ({p.drafts.length})</h3>
-            {p.drafts.map((d, i) => (
-              <div className="draftcard" key={i}>
-                <div className="meta">
-                  <span className="badge stage">{d.type}</span>
-                  <span className="badge {d.channel}">{d.channel}</span>
-                  {d.sent && <span className="badge yes">sent</span>}
-                  <span>{new Date(d.ts).toLocaleString()}</span>
-                </div>
-                {d.subject && <div className="subject">{d.subject}</div>}
-                <pre>{d.body}</pre>
-                <div className="actions">
-                  <button className="btn small" onClick={() => copyDraft(d)}>📋 Copy</button>
-                  {d.channel === 'email' && p.email && !d.sent && (
-                    <button className="btn small primary" onClick={() => sendEmail(d)} disabled={busy === 'send'}>
-                      {busy === 'send' ? 'Sending…' : `📤 Send to ${p.email}`}
-                    </button>
-                  )}
-                  {d.channel === 'linkedin' && p.linkedin && (
-                    <a className="btn small" href={p.linkedin} target="_blank" style={{ textDecoration: 'none', display: 'inline-block' }}>Open LinkedIn ↗</a>
-                  )}
-                </div>
-              </div>
+            <p className="sub" style={{ marginBottom: 10 }}>Edit the text directly, or type an instruction and hit ✨ Revise to have the AI rewrite it. Nothing is sent until you click Send.</p>
+            {p.drafts.map((d) => (
+              <DraftCard key={d.ts} d={d} prospect={p} flash={flash} onChanged={onChanged} />
             ))}
           </div>
         )}

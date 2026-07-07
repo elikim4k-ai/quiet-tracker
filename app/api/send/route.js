@@ -4,7 +4,7 @@ import { sendEmail, smtpConfigured } from '@/lib/mailer';
 
 export async function POST(req) {
   try {
-    const { prospectId, subject, body } = await req.json();
+    const { prospectId, subject, body, draftTs = '' } = await req.json();
     const [p, settings] = await Promise.all([getProspect(prospectId), getSettings()]);
     if (!p) return NextResponse.json({ error: 'Prospect not found' }, { status: 404 });
     if (!p.email) return NextResponse.json({ error: 'Prospect has no email address' }, { status: 400 });
@@ -12,8 +12,13 @@ export async function POST(req) {
       return NextResponse.json({ error: 'SMTP not configured. Add SMTP settings first.' }, { status: 400 });
     }
     await sendEmail(settings, { to: p.email, subject, body });
-    const d = p.drafts.find((x) => x.subject === subject && x.body === body);
-    if (d) d.sent = true;
+    // Record exactly what was sent (the user may have edited the draft before sending).
+    const d = p.drafts.find((x) => x.ts === draftTs) || p.drafts.find((x) => x.subject === subject && x.body === body);
+    if (d) {
+      d.subject = subject;
+      d.body = body;
+      d.sent = true;
+    }
     p.followUp.lastContacted = new Date().toISOString();
     p.statusLog.push({ date: new Date().toISOString().slice(0, 10), note: `Email sent: "${subject}"` });
     if (p.stage === 'New') p.stage = 'Contacted';

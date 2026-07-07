@@ -23,23 +23,52 @@ const TYPE_INSTRUCTIONS = {
   reply: 'They replied. Using REPLY_TEXT below, write a response that moves toward a scheduled intro call (or the next stage). Answer their questions directly.',
 };
 
+function channelNoteFor(p, channel) {
+  return channel === 'linkedin'
+    ? p.linkedinConnected === 'Yes'
+      ? 'Channel: LinkedIn direct message (under 100 words, no subject).'
+      : 'Channel: LinkedIn connection request note (under 280 characters, no subject).'
+    : 'Channel: email.';
+}
+
 export async function POST(req) {
   try {
-    const { prospectId, type = 'cold', channel = 'email', replyText = '', instructions = '' } = await req.json();
+    const {
+      prospectId, type = 'cold', channel = 'email', replyText = '', instructions = '',
+      draftTs = '', currentSubject = '', currentBody = '',
+    } = await req.json();
     const [p, settings] = await Promise.all([getProspect(prospectId), getSettings()]);
     if (!p) return NextResponse.json({ error: 'Prospect not found' }, { status: 404 });
 
-    const channelNote =
-      channel === 'linkedin'
-        ? p.linkedinConnected === 'Yes'
-          ? 'Channel: LinkedIn direct message (under 100 words, no subject).'
-          : 'Channel: LinkedIn connection request note (under 280 characters, no subject).'
-        : 'Channel: email.';
+    // Revise an existing draft in place, per the user's chat instruction.
+    if (type === 'revise') {
+      const record = p.drafts.find((d) => d.ts === draftTs);
+      if (!record) return NextResponse.json({ error: 'Draft not found' }, { status: 404 });
+      const user = `${prospectContext(p)}
+
+CURRENT DRAFT (${record.channel}):
+SUBJECT: ${currentSubject || record.subject}
+BODY:
+"""${currentBody || record.body}"""
+
+TASK: Revise the current draft following this instruction from the sender: "${instructions}"
+Keep everything that still fits; change only what the instruction requires.
+${channelNoteFor(p, record.channel)}
+
+Respond with JSON only: {"subject": "...", "body": "..."} (subject empty string for LinkedIn).`;
+      const raw = await aiComplete(settings, { system: outreachSystemPrompt(settings), user, json: true });
+      const draft = parseJsonLoose(raw);
+      record.subject = draft.subject || '';
+      record.body = draft.body || String(raw);
+      record.revised = true;
+      await saveProspect(p);
+      return NextResponse.json({ draft: record });
+    }
 
     const user = `${prospectContext(p)}
 
 TASK: ${TYPE_INSTRUCTIONS[type] || TYPE_INSTRUCTIONS.cold}
-${channelNote}
+${channelNoteFor(p, channel)}
 ${replyText ? `\nREPLY_TEXT from ${p.contactPerson}:\n"""${replyText}"""` : ''}
 ${instructions ? `\nEXTRA INSTRUCTIONS FROM SENDER: ${instructions}` : ''}
 
