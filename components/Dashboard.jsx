@@ -236,6 +236,7 @@ export default function Dashboard() {
         <ProspectDrawer
           prospect={selected}
           aiReady={aiReady}
+          settings={settings}
           onClose={() => setSelected(null)}
           onChanged={refresh}
           flash={flash}

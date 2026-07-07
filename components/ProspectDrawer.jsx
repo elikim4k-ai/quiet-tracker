@@ -8,14 +8,30 @@ const F = ({ label, children }) => (
   </div>
 );
 
-// One draft: inline-editable, sendable, and revisable via an AI instruction box.
-function DraftCard({ d, prospect: p, flash, onChanged }) {
+// One draft: inline-editable, sendable (with attachments), and revisable via an AI instruction box.
+function DraftCard({ d, prospect: p, signature, flash, onChanged }) {
   const [subject, setSubject] = useState(d.subject);
   const [body, setBody] = useState(d.body);
   const [instruction, setInstruction] = useState('');
+  const [files, setFiles] = useState([]); // [{filename, contentBase64, size}]
   const [busy, setBusy] = useState('');
   useEffect(() => { setSubject(d.subject); setBody(d.body); }, [d.subject, d.body]);
   const dirty = subject !== d.subject || body !== d.body;
+
+  async function addFiles(e) {
+    const picked = [...(e.target.files || [])];
+    e.target.value = '';
+    const next = [...files];
+    for (const f of picked) {
+      const buf = new Uint8Array(await f.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      next.push({ filename: f.name, contentBase64: btoa(bin), size: f.size });
+    }
+    const total = next.reduce((s, f) => s + f.size, 0);
+    if (total > 3 * 1024 * 1024) return flash('err', 'Attachments too large — keep the total under 3 MB.');
+    setFiles(next);
+  }
 
   async function saveEdits() {
     setBusy('save');
@@ -54,15 +70,17 @@ function DraftCard({ d, prospect: p, flash, onChanged }) {
   }
 
   async function send() {
-    if (!confirm(`Send this email to ${p.contactPerson || p.organization} <${p.email}>?\n\nSubject: ${subject}`)) return;
+    const attachNote = files.length ? `\nAttachments: ${files.map((f) => f.filename).join(', ')}` : '';
+    if (!confirm(`Send this email to ${p.contactPerson || p.organization} <${p.email}>?\n\nSubject: ${subject}${attachNote}`)) return;
     setBusy('send');
     const r = await fetch('/api/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prospectId: p.id, subject, body, draftTs: d.ts }),
+      body: JSON.stringify({ prospectId: p.id, subject, body, draftTs: d.ts, attachments: files.map(({ filename, contentBase64 }) => ({ filename, contentBase64 })) }),
     }).then((r) => r.json());
     setBusy('');
     if (r.error) return flash('err', r.error);
+    setFiles([]);
     flash('ok', `Email sent to ${p.email}.`);
     onChanged();
   }
@@ -106,6 +124,24 @@ function DraftCard({ d, prospect: p, flash, onChanged }) {
           </button>
         </div>
       )}
+      {!d.sent && d.channel === 'email' && (
+        <div className="row" style={{ marginTop: 8 }}>
+          <label className="btn small" style={{ cursor: 'pointer' }}>
+            📎 Attach files
+            <input type="file" multiple style={{ display: 'none' }} onChange={addFiles} />
+          </label>
+          {files.map((f, i) => (
+            <span key={i} className="badge no">
+              {f.filename} ({Math.round(f.size / 1024)} KB){' '}
+              <a style={{ cursor: 'pointer', color: 'var(--red)' }} onClick={() => setFiles(files.filter((_, j) => j !== i))}>✕</a>
+            </span>
+          ))}
+          {signature && <span className="sub">signature added on send</span>}
+        </div>
+      )}
+      {d.sent && d.attachmentNames?.length > 0 && (
+        <div className="sub" style={{ marginTop: 6 }}>📎 Sent with: {d.attachmentNames.join(', ')}</div>
+      )}
       <div className="actions">
         {dirty && !d.sent && (
           <button className="btn small primary" onClick={saveEdits} disabled={busy === 'save'}>
@@ -126,7 +162,35 @@ function DraftCard({ d, prospect: p, flash, onChanged }) {
   );
 }
 
-export default function ProspectDrawer({ prospect: p, aiReady, onClose, onChanged, flash }) {
+// A status-log line; clickable when it can be linked to a sent email (or any draft).
+function LogEntry({ s, drafts }) {
+  const [open, setOpen] = useState(false);
+  const linked =
+    (s.draftTs && drafts.find((d) => d.ts === s.draftTs)) ||
+    (/email sent|auto-sent/i.test(s.note) ? drafts.find((d) => d.sent && d.subject && s.note.includes(`"${d.subject}"`)) : null);
+
+  return (
+    <div className="entry">
+      <div className="date">{s.date || '—'}</div>
+      <div
+        onClick={() => linked && setOpen(!open)}
+        style={linked ? { cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--border)', textUnderlineOffset: 3 } : undefined}
+        title={linked ? 'Click to view the email' : undefined}
+      >
+        {s.note} {linked && <span className="sub">{open ? '▾' : '▸ view email'}</span>}
+      </div>
+      {open && linked && (
+        <div className="draftcard" style={{ marginTop: 6 }}>
+          {linked.subject && <div className="subject">{linked.subject}</div>}
+          <pre>{linked.body}</pre>
+          {linked.attachmentNames?.length > 0 && <div className="sub" style={{ marginTop: 6 }}>📎 {linked.attachmentNames.join(', ')}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProspectDrawer({ prospect: p, aiReady, settings, onClose, onChanged, flash }) {
   const [form, setForm] = useState({ ...p });
   const [note, setNote] = useState('');
   const [draftType, setDraftType] = useState('cold');
@@ -310,7 +374,7 @@ export default function ProspectDrawer({ prospect: p, aiReady, onClose, onChange
             <h3>Drafts ({p.drafts.length})</h3>
             <p className="sub" style={{ marginBottom: 10 }}>Edit the text directly, or type an instruction and hit ✨ Revise to have the AI rewrite it. Nothing is sent until you click Send.</p>
             {p.drafts.map((d) => (
-              <DraftCard key={d.ts} d={d} prospect={p} flash={flash} onChanged={onChanged} />
+              <DraftCard key={d.ts} d={d} prospect={p} signature={settings?.emailSignature} flash={flash} onChanged={onChanged} />
             ))}
           </div>
         )}
@@ -325,10 +389,7 @@ export default function ProspectDrawer({ prospect: p, aiReady, onClose, onChange
           </div>
           <div className="log">
             {[...(p.statusLog || [])].reverse().map((s, i) => (
-              <div className="entry" key={i}>
-                <div className="date">{s.date || '—'}</div>
-                <div>{s.note}</div>
-              </div>
+              <LogEntry key={i} s={s} drafts={p.drafts || []} />
             ))}
             {(!p.statusLog || p.statusLog.length === 0) && <div className="sub">No history yet.</div>}
           </div>

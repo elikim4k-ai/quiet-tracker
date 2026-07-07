@@ -100,6 +100,11 @@ export default function SettingsPanel({ settings, onSaved }) {
           <div className="field"><label>Your name</label><input value={form.senderName} onChange={(e) => set('senderName', e.target.value)} /></div>
           <div className="field"><label>Your title at WISER</label><input value={form.senderTitle} onChange={(e) => set('senderTitle', e.target.value)} placeholder="e.g. Partnerships Lead" /></div>
           <div className="field full"><label>Your email</label><input value={form.senderEmail} onChange={(e) => set('senderEmail', e.target.value)} /></div>
+          <div className="field full">
+            <label>Email signature (appended to every outgoing email)</label>
+            <textarea rows={4} value={form.emailSignature || ''} onChange={(e) => set('emailSignature', e.target.value)}
+              placeholder={"--\nElijah Kim\nPartnerships, WISER — The Washington Institute for STEM, Entrepreneurship and Research\nthewiser.org | elijah.k@thewiser.org"} />
+          </div>
         </div>
       </div>
 
