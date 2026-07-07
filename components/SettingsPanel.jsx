@@ -101,10 +101,29 @@ export default function SettingsPanel({ settings, onSaved }) {
           <div className="field"><label>Your title at WISER</label><input value={form.senderTitle} onChange={(e) => set('senderTitle', e.target.value)} placeholder="e.g. Partnerships Lead" /></div>
           <div className="field full"><label>Your email</label><input value={form.senderEmail} onChange={(e) => set('senderEmail', e.target.value)} /></div>
           <div className="field full">
-            <label>Email signature (appended to every outgoing email)</label>
-            <textarea rows={4} value={form.emailSignature || ''} onChange={(e) => set('emailSignature', e.target.value)}
-              placeholder={"--\nElijah Kim\nPartnerships, WISER — The Washington Institute for STEM, Entrepreneurship and Research\nthewiser.org | elijah.k@thewiser.org"} />
+            <label>Email signature — plain text (appended to every outgoing email)</label>
+            <textarea rows={5} value={form.emailSignature || ''} onChange={(e) => set('emailSignature', e.target.value)}
+              placeholder={"Elijah Kim\nHead of Wiser Insider\nWISER\n…"} />
           </div>
+          <div className="field full">
+            <label>Email signature — HTML (optional; makes links clickable in the email)</label>
+            <textarea rows={5} value={form.emailSignatureHtml || ''} onChange={(e) => set('emailSignatureHtml', e.target.value)}
+              placeholder={'<p>Elijah Kim<br><a href="https://thewiser.org">thewiser.org</a></p>'} />
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>📊 Google Sheet sync</h3>
+        <p className="hint">
+          Lets the "⇪ Sync Google Sheet" button push the tracker to a shared spreadsheet.
+          One-time setup: open the sheet → Extensions → Apps Script → paste the script from{' '}
+          <span className="mono">scripts/google-sheet-sync.gs</span> (in the project repo) with the secret below → Deploy as Web app
+          (Execute as: Me, Access: Anyone) → paste the /exec URL here.
+        </p>
+        <div className="fieldgrid">
+          <div className="field full"><label>Web app URL</label><input value={form.sheetSyncUrl || ''} onChange={(e) => set('sheetSyncUrl', e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" /></div>
+          <div className="field full"><label>Sync secret (must match SECRET in the Apps Script)</label><input value={form.sheetSyncSecret || ''} onChange={(e) => set('sheetSyncSecret', e.target.value)} /></div>
         </div>
       </div>
 

@@ -80,6 +80,14 @@ export default function Dashboard() {
     refresh();
   }
 
+  async function syncSheet() {
+    setBusy('sheet');
+    const r = await fetch('/api/export-sheet', { method: 'POST' }).then((r) => r.json());
+    setBusy('');
+    if (r.error) return flash('err', r.error);
+    flash('ok', `Google Sheet updated — ${r.rows} prospects synced.`);
+  }
+
   async function runFollowUpEngine() {
     setBusy('engine');
     const r = await fetch('/api/followups', { method: 'POST' }).then((r) => r.json());
@@ -121,6 +129,10 @@ export default function Dashboard() {
           <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={uploadFile} />
           <button className="btn" onClick={() => fileRef.current.click()} disabled={busy === 'import'}>
             {busy === 'import' ? 'Importing…' : '⬆ Import Excel'}
+          </button>
+          <button className="btn" onClick={syncSheet} disabled={busy === 'sheet'}
+            title={settings?.sheetSyncUrl ? 'Rewrite the shared Google Sheet with current tracker data' : 'Set up the sync URL in Settings first'}>
+            {busy === 'sheet' ? 'Syncing…' : '⇪ Sync Google Sheet'}
           </button>
           <button className="btn primary" onClick={runFollowUpEngine} disabled={busy === 'engine' || !aiReady} title={aiReady ? '' : 'Add an API key in Settings first'}>
             {busy === 'engine' ? 'Drafting…' : `✨ Draft due follow-ups (${due.length})`}
