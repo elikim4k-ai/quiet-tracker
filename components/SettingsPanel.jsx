@@ -166,6 +166,13 @@ export default function SettingsPanel({ settings, onSaved }) {
             </select>
           </div>
           <div className="field">
+            <label>Weekly summary email (Friday morning NZ)</label>
+            <select value={form.weeklyReport === false ? 'off' : 'on'} onChange={(e) => set('weeklyReport', e.target.value === 'on')}>
+              <option value="on">On — email me every Friday</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+          <div className="field">
             <label>Default follow-up frequency (days)</label>
             <input type="number" min={1} value={form.defaultFollowUpDays} onChange={(e) => set('defaultFollowUpDays', Number(e.target.value) || 7)} />
           </div>

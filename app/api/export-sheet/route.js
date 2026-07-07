@@ -8,6 +8,11 @@ export async function POST() {
     if (!settings.sheetSyncUrl) {
       return NextResponse.json({ error: 'No Google Sheet sync URL configured. Add it in Settings (see the setup hint there).' }, { status: 400 });
     }
+    if (!/^https:\/\/script\.google\.com\/macros\/.+\/exec$/.test(settings.sheetSyncUrl.trim())) {
+      return NextResponse.json({
+        error: 'The sync URL must be the Apps Script Web app URL (https://script.google.com/macros/s/…/exec) — not the spreadsheet link. In the sheet: Extensions → Apps Script → Deploy → Web app, then copy the /exec URL.',
+      }, { status: 400 });
+    }
     const header = [
       '#', 'Organization', 'Location', 'Product', 'Description', 'Category',
       'Contact Person', 'Title', 'Email', 'LinkedIn Profile', 'LinkedIn Connect',
