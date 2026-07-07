@@ -32,7 +32,7 @@ function doPost(e) {
     sh.getRange(1, 1, norm.length, width).setValues(norm);
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, width).setFontWeight('bold');
-    sh.getRange(norm.length + 2, 1).setValue('Last synced from Quiet Tracker: ' + data.updatedAt);
+    sh.getRange(norm.length + 2, 1).setValue(data.footer || ('Last synced: ' + data.updatedAt));
     return out({ ok: true, rows: norm.length - 1 });
   } catch (err) {
     return out({ ok: false, error: String(err) });

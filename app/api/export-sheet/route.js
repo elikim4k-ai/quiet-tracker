@@ -42,6 +42,9 @@ export async function POST() {
       body: JSON.stringify({
         secret: settings.sheetSyncSecret || '',
         updatedAt: new Date().toISOString(),
+        footer: `Last synced: ${new Intl.DateTimeFormat('en-NZ', {
+          dateStyle: 'medium', timeStyle: 'short', timeZone: 'Pacific/Auckland',
+        }).format(new Date())} (NZ)`,
         rows: [header, ...rows],
       }),
     });
