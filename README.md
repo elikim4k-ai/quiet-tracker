@@ -4,8 +4,12 @@ A local dashboard for tracking WISER Insider Program prospects (quantum & AI sof
 
 ## Run it
 
-```powershell
-cd "C:\Users\eliki\OneDrive\Desktop\Quiet Tracker"
+Prerequisites: Git and Node.js 22 LTS. From a terminal:
+
+```bash
+git clone https://github.com/elikim4k-ai/quiet-tracker.git
+cd quiet-tracker
+npm ci
 npm run dev
 ```
 
@@ -38,7 +42,7 @@ AI keys can go in the Settings tab (stored in the DB) or as `OPENAI_API_KEY` / `
 
 ## Deploy to Vercel (24/7 + share with coworkers)
 
-The repo is at **https://github.com/elikim4k-ai/quiet-tracker** (private).
+The repo is at **https://github.com/elikim4k-ai/quiet-tracker** (public).
 
 1. Go to https://vercel.com/new → Import `elikim4k-ai/quiet-tracker`.
 2. **Framework Preset must say "Next.js"** (if it says "Other", fix it — otherwise every route 404s).
@@ -56,3 +60,26 @@ The repo is at **https://github.com/elikim4k-ai/quiet-tracker** (private).
 - **Weekly Monday 14:00 UTC** — `/api/cron/discover`: adds new Quantum/AI companies automatically.
 
 Pushing to `main` auto-deploys.
+
+## Validate and reproduce a local demo
+
+For a local-only review, leave Supabase variables unset to use `data/db.json`.
+Start with a fresh clone, open `http://localhost:3210`, and verify the dashboard
+loads. Add one synthetic prospect, reload, and confirm it persists locally.
+Do not use real contacts for a public reproduction fixture. Workbook import
+requires a workbook with the sheet/column structure described above; no sample
+workbook is supplied, so that path needs a separately documented fixture.
+
+```bash
+npm run build
+npm run start
+```
+
+Stop the development server first so the production server can use port 3210.
+There is no automated test script in `package.json`; a successful build is not
+an automated functional test. AI drafting/discovery require a provider key,
+and SMTP delivery requires mail configuration. External model responses are
+not deterministic. Record the commit, Node/npm versions, synthetic input,
+storage mode, provider/model, and observed output for a reproducible report.
+Local database files and settings can contain API keys and contact data;
+exclude them from shared artifacts.
